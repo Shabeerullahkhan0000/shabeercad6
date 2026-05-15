@@ -275,6 +275,16 @@ importers:
         specifier: ^2.1.6
         version: 2.2.12(typescript@5.9.3)
 
+  packages/entity-model:
+    dependencies:
+      '@mlightcad/data-model':
+        specifier: ^1.7.34
+        version: 1.7.34
+    devDependencies:
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   packages/examples:
     devDependencies:
       '@mlightcad/cad-simple-viewer-example':
