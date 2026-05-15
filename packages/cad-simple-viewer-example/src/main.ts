@@ -28,51 +28,46 @@ const EXAMPLE_COMMAND_ALIASES = {
 }
 
 class CadViewerApp {
-  private container: HTMLDivElement
-  private fileInput: HTMLInputElement
-  private centerOpenButton: HTMLButtonElement
-  private toolbarOpenButton: HTMLButtonElement
-  private toolbarZoomButton: HTMLButtonElement
-  private toolbarZoomWindowButton: HTMLButtonElement
-  private toolbarBgButton: HTMLButtonElement
-  private toolbarPickboxButton: HTMLButtonElement
-  private toolbarLineWeightButton: HTMLButtonElement
-  private emptyState: HTMLDivElement
-  private predefinedButtons: NodeListOf<HTMLButtonElement>
+  private container: HTMLDivElement | null = null
+  private fileInput: HTMLInputElement | null = null
+  private centerOpenButton: HTMLButtonElement | null = null
+  private toolbarOpenButton: HTMLButtonElement | null = null
+  private toolbarZoomButton: HTMLButtonElement | null = null
+  private toolbarZoomWindowButton: HTMLButtonElement | null = null
+  private toolbarBgButton: HTMLButtonElement | null = null
+  private toolbarPickboxButton: HTMLButtonElement | null = null
+  private toolbarLineWeightButton: HTMLButtonElement | null = null
+  private emptyState: HTMLDivElement | null = null
+  private predefinedButtons: NodeListOf<HTMLButtonElement> | null = null
   private isInitialized: boolean = false
+  private isInitializing: boolean = false
   private hasOpenedFile: boolean = false
   private hasLoadedDocument: boolean = false
 
   constructor() {
-    this.container = document.getElementById('cad-container') as HTMLDivElement
-    this.fileInput = document.getElementById(
-      'fileInputElement'
-    ) as HTMLInputElement
-    this.centerOpenButton = document.getElementById(
-      'centerOpenButton'
-    ) as HTMLButtonElement
-    this.toolbarOpenButton = document.getElementById(
-      'toolbarOpenButton'
-    ) as HTMLButtonElement
-    this.toolbarZoomButton = document.getElementById(
-      'toolbarZoomButton'
-    ) as HTMLButtonElement
-    this.toolbarZoomWindowButton = document.getElementById(
-      'toolbarZoomWindowButton'
-    ) as HTMLButtonElement
-    this.toolbarBgButton = document.getElementById(
-      'toolbarBgButton'
-    ) as HTMLButtonElement
-    this.toolbarPickboxButton = document.getElementById(
-      'toolbarPickboxButton'
-    ) as HTMLButtonElement
-    this.toolbarLineWeightButton = document.getElementById(
-      'toolbarLineWeightButton'
-    ) as HTMLButtonElement
-    this.emptyState = document.getElementById('emptyState') as HTMLDivElement
+    // SSR guard - only run in browser
+    if (typeof document === 'undefined') {
+      return
+    }
+
+    // Lazy DOM setup - fetch elements only when needed
+    this.lazySetupDOM()
+  }
+
+  private lazySetupDOM() {
+    this.container = document.getElementById('cad-container')
+    this.fileInput = document.getElementById('fileInputElement')
+    this.centerOpenButton = document.getElementById('centerOpenButton')
+    this.toolbarOpenButton = document.getElementById('toolbarOpenButton')
+    this.toolbarZoomButton = document.getElementById('toolbarZoomButton')
+    this.toolbarZoomWindowButton = document.getElementById('toolbarZoomWindowButton')
+    this.toolbarBgButton = document.getElementById('toolbarBgButton')
+    this.toolbarPickboxButton = document.getElementById('toolbarPickboxButton')
+    this.toolbarLineWeightButton = document.getElementById('toolbarLineWeightButton')
+    this.emptyState = document.getElementById('emptyState')
     this.predefinedButtons = document.querySelectorAll(
       '#predefinedFileList .file-list-item'
-    ) as NodeListOf<HTMLButtonElement>
+    )
 
     this.setupFileHandling()
     this.setupToolbarActions()
@@ -81,32 +76,48 @@ class CadViewerApp {
     this.updateToolbarButtonsState()
   }
 
-  private initialize() {
-    if (!this.isInitialized) {
-      try {
-        AcApDocManager.createInstance({
-          container: this.container,
-          autoResize: true,
-          baseUrl: 'https://cdn.jsdelivr.net/gh/mlightcad/cad-data@main/',
-          commandAliases: EXAMPLE_COMMAND_ALIASES,
-          webworkerFileUrls: {
-            mtextRender: './workers/mtext-renderer-worker.js',
-            dxfParser: './workers/dxf-parser-worker.js',
-            dwgParser: './workers/libredwg-parser-worker.js'
-          }
-        })
+private initialize() {
+    // Guard: prevent repeated init or concurrent init
+    if (this.isInitialized || this.isInitializing) {
+      return
+    }
 
-        AcApDocManager.instance.events.documentActivated.addEventListener(
-          args => {
-            document.title = args.doc.docTitle
-          }
-        )
+    // Guard: require container
+    if (!this.container) {
+      this.showMessage('CAD container not found', 'error')
+      return
+    }
 
-        this.isInitialized = true
-      } catch (error) {
-        log.error('Failed to initialize CAD viewer:', error)
-        this.showMessage('Failed to initialize CAD viewer', 'error')
-      }
+    this.isInitializing = true
+    this.showMessage('Loading CAD viewer...', 'info')
+
+    try {
+      AcApDocManager.createInstance({
+        container: this.container,
+        autoResize: true,
+        baseUrl: 'https://cdn.jsdelivr.net/gh/mlightcad/cad-data@main/',
+        commandAliases: EXAMPLE_COMMAND_ALIASES,
+        webworkerFileUrls: {
+          mtextRender: './workers/mtext-renderer-worker.js',
+          dxfParser: './workers/dxf-parser-worker.js',
+          dwgParser: './workers/libredwg-parser-worker.js'
+        }
+      })
+
+      AcApDocManager.instance.events.documentActivated.addEventListener(
+        args => {
+          document.title = args.doc.docTitle
+        }
+      )
+
+      this.isInitialized = true
+      this.clearMessages()
+      this.showMessage('CAD viewer ready', 'success')
+    } catch (error) {
+      log.error('Failed to initialize CAD viewer:', error)
+      this.showMessage('Failed to initialize CAD viewer', 'error')
+    } finally {
+      this.isInitializing = false
     }
   }
 
