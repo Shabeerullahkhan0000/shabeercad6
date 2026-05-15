@@ -2,6 +2,40 @@
 
 ## Completed Tasks
 
+### Task 43: Stabilize Vercel Install and Active Simple Viewer Build
+- **Date**: 2026-05-15
+- **Action**: Removed install-time app build and verified active Nx/Vite build path
+- **Status**: Build checklist passes locally
+- **Files Changed**:
+  - package.json
+  - packages/entity-model/src/gesture-integration.ts
+  - TASK_LOG.md
+  - NEXT_TASK.md
+- **Root Cause Found**: Root `postinstall` was `pnpm build:vercel`. That still made `pnpm install` run the active app build during Vercel install, so TypeScript/Vite failures could stop dependency installation before Vercel reached the explicit `buildCommand`.
+- **Changes**:
+  1. Removed root `postinstall`; Vercel install now only installs dependencies.
+  2. Kept `vercel.json` build order explicit through `buildCommand: "pnpm build:vercel"`.
+  3. Replaced `gesture-integration.ts` cleanup casts with the typed disposer returned by `attachGestureHandler()`.
+  4. Added the missing `beforeunload` registration that matched the existing cleanup removal path.
+- **TypeScript Errors Fixed / Verified**:
+  - `packages/entity-model` currently reports no TypeScript errors with `tsc --project tsconfig.json`.
+  - BoundingBox access is already using `minX/minY/maxX/maxY`; no remaining `.min`/`.max` BoundingBox misuse was found in active source.
+  - `gesture-integration.ts` no longer uses `handler as any` for DOM listener cleanup.
+  - `cad-simple-viewer-example/src/main.ts` currently compiles; no strict DOM null/type errors remain in the active build.
+- **Commands Run**:
+  1. `pnpm.cmd install` - pass. Used `.cmd` because PowerShell blocks `pnpm.ps1` execution on this machine.
+  2. `pnpm.cmd --filter @mlightcad/entity-model build` - pass.
+  3. `pnpm.cmd nx run @mlightcad/cad-simple-viewer:build` - pass.
+  4. `pnpm.cmd nx run @mlightcad/cad-simple-viewer-example:build` - pass.
+  5. `pnpm.cmd nx run @mlightcad/cad-simple-viewer:build --skip-nx-cache` - pass outside sandbox after sandbox-only Windows access denied from esbuild/Vite.
+  6. `pnpm.cmd nx run @mlightcad/cad-simple-viewer-example:build --skip-nx-cache` - pass outside sandbox.
+  7. `pnpm.cmd nx reset` - pass; cleared a local Nx daemon `EADDRINUSE` conflict.
+  8. `pnpm.cmd build:vercel` - pass outside sandbox after sandbox-only Windows access denied from esbuild/Vite.
+- **Remaining Risks**:
+  - Vite/Rollup still emits external global-name warnings and a large chunk warning; these are non-fatal and unchanged.
+  - Live Vercel deployment still needs verification, especially worker asset serving and DWG/DXF loading.
+- **Next Task**: Push and verify the Vercel deployment logs show install completes before `pnpm build:vercel`.
+
 ### Task 42: Fix Vercel Nx Project Target
 - **Date**: 2026-05-15
 - **Action**: Fixed Vercel build scripts so deployment runs the real Nx target

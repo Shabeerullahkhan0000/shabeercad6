@@ -124,6 +124,7 @@ export function createGestureViewerIntegration(
 let handler: MobileGestureHandler | null = null
   let attached = false
   let canvas: HTMLCanvasElement | null = null
+  let detachGestureHandler: (() => void) | null = null
 
   /** Get canvas via injected getter */
   function getCanvas(): HTMLCanvasElement | null {
@@ -183,7 +184,10 @@ function attach() {
     }
 
     // Attach gesture handler to canvas
-    attachGestureHandler(handler, canvas)
+    detachGestureHandler = attachGestureHandler(handler, canvas)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', cleanup)
+    }
 
     attached = true
   }
@@ -201,11 +205,8 @@ function attach() {
       return
     }
 
-    // Remove event listeners
-    canvas.removeEventListener('touchstart', handler as any)
-    canvas.removeEventListener('touchmove', handler as any)
-    canvas.removeEventListener('touchend', handler as any)
-    canvas.removeEventListener('touchcancel', handler as any)
+    detachGestureHandler?.()
+    detachGestureHandler = null
     // Remove beforeunload fallback
     if (typeof window !== 'undefined') {
       window.removeEventListener('beforeunload', cleanup)

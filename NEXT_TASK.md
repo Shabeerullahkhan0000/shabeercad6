@@ -3,13 +3,14 @@
 ## Priority 1: Vercel Deployment
 
 ### Task: Verify live Vercel deployment after main push
-- **Why**: Ensure GitHub main triggers the Vercel build and worker assets are served
+- **Why**: Ensure Vercel install no longer builds during `postinstall`, then the explicit `pnpm build:vercel` command builds the app and worker assets are served
 - **Files**: vercel.json, package.json
 - **Test Steps**:
   1. Push to GitHub main branch
-  2. Check Vercel build logs
-  3. Verify deployment succeeds
-  4. Open the deployed app and load a small DXF/DWG file
+  2. Check Vercel install logs and confirm `pnpm install` completes without a root `postinstall` build
+  3. Confirm Vercel build logs run `pnpm build:vercel`
+  4. Verify deployment succeeds
+  5. Open the deployed app and load a small DXF/DWG file
 - **Risk**: Medium - Network dependent
 
 ## Priority 2: Code Quality Improvements
@@ -44,7 +45,7 @@
 - COOP/COEP headers for SharedArrayBuffer
 - SPA fallback configured
 - Vercel build now uses `pnpm build:vercel`
-- Root postinstall now avoids the deprecated full monorepo build path
+- Root postinstall removed so install is not the build system
 
 ## Completed: Entity Model Package ✅
 - packages/entity-model created
@@ -52,6 +53,7 @@
 - Gestures, gesture integration
 - Distance measurement module
 - Snap engine module
+- `@mlightcad/entity-model` targeted build passes
 
 ## Completed: Repository Inspection ✅
 - @mlightcad/cad-simple-viewer confirmed as foundation

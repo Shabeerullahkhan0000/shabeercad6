@@ -14,7 +14,6 @@
   ],
   "packageManager": "pnpm@10.33.4",
   "scripts": {
-    "postinstall": "pnpm build:vercel",
     "analyze": "nx run-many -t analyze",
     "build": "nx run-many -t build",
     "build:vercel": "nx run @mlightcad/cad-simple-viewer-example:build",
