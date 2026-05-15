@@ -1,18 +1,25 @@
 /**
- * Basic Two-Point Distance Measurement
- *
- * Mobile-first: tap Point A, tap Point B, show line/distance.
- * No snapping. No live preview after Point A on mobile. Fast response.
+ * Two-Point Distance Measurement
+ * 
+ * Features:
+ * - Basic: tap Point A, tap Point B, show line/distance
+ * - Editable: P1/P2 handles, drag to update, distance updates live
+ * - No snapping, no endpoint editing
  * 
  * Uses:
  * - @mlightcad/cad-simple-viewer for CAD rendering (not mutated)
- * - Overlay manager for DOM rendering
+ * - Overlay manager for DOM rendering + handles
  * - Geometry helpers for distance calculation
  */
 
 import { Point2D, Point3D } from './types.js'
-import { distance, worldToScreen, screenToWorld } from './geometry.js'
-import { OverlayManager, MeasurementOverlay, ViewportState } from './overlay.js'
+import { distance } from './geometry.js'
+import { 
+  worldToScreen, 
+  screenToWorld, 
+  OverlayManager, 
+  ViewportState
+} from './overlay.js'
 
 // ============================================================================
 // Measurement State
@@ -25,7 +32,11 @@ export enum MeasurementState {
   /** First point (Point A) selected */
   POINT_A = 'point_a',
   /** Both points selected - measurement complete */
-  COMPLETE = 'complete'
+  COMPLETE = 'complete',
+  /** Dragging P1 handle */
+  DRAGGING_P1 = 'dragging_p1',
+  /** Dragging P2 handle */
+  DRAGGING_P2 = 'dragging_p2'
 }
 
 /** Distance measurement result */
@@ -51,18 +62,26 @@ export interface DistanceMeasurementConfig {
   getViewport: () => ViewportState
   /** Callback when measurement is complete */
   onComplete?: (result: DistanceMeasurementResult) => void
+  /** Callback when distance changes during drag */
+  onDrag?: (result: DistanceMeasurementResult) => void
   /** Distance unit: 'mm' | 'cm' | 'm' | 'in' | 'ft' */
   unit?: 'mm' | 'cm' | 'm' | 'in' | 'ft'
   /** Distance precision (decimal places) */
   precision?: number
-  /** Enable second tap immediately (no delay) */
-  fastMode?: boolean
+  /** Handle size in pixels */
+  handleSize?: number
+  /** Enable handles for P1/P2 editing */
+  enableHandles?: boolean
+  /** Block pan when dragging handle */
+  blockPanOnDrag?: boolean
 }
 
 const defaultConfig: Partial<DistanceMeasurementConfig> = {
   unit: 'm',
   precision: 2,
-  fastMode: true
+  handleSize: 12,
+  enableHandles: true,
+  blockPanOnDrag: true
 }
 
 // ============================================================================
@@ -76,6 +95,12 @@ export interface DistanceMeasurementManager {
   getResult: () => DistanceMeasurementResult | null
   /** Handle screen tap */
   onTap: (screenPoint: Point2D) => void
+  /** Handle screen drag start (for handles) */
+  onDragStart: (screenPoint: Point2D) => boolean
+  /** Handle screen drag move */
+  onDragMove: (screenPoint: Point2D) => void
+  /** Handle screen drag end */
+  onDragEnd: () => void
   /** Cancel current measurement */
   cancel: () => void
   /** Reset for next measurement */
@@ -86,7 +111,15 @@ export interface DistanceMeasurementManager {
 export function createDistanceMeasurement(
   config: DistanceMeasurementConfig
 ): DistanceMeasurementManager {
-  const { overlay, getViewport, onComplete } = {
+  const { 
+    overlay, 
+    getViewport, 
+    onComplete,
+    onDrag,
+    handleSize = 12,
+    enableHandles = true,
+    blockPanOnDrag = true
+  } = {
     ...defaultConfig,
     ...config
   }
@@ -95,6 +128,7 @@ export function createDistanceMeasurement(
   let pointA: Point3D | null = null
   let pointB: Point3D | null = null
   let result: DistanceMeasurementResult | null = null
+  let draggingHandle: 'p1' | 'p2' | null = null
 
   function formatDistance(dist: number, unit: string, precision: number): string {
     let value = dist
@@ -119,8 +153,54 @@ export function createDistanceMeasurement(
 
   function clearMeasurement(): void {
     overlay.removeMeasurement('distance-line')
-    overlay.removeLabel('distance-label-a')
-    overlay.removeLabel('distance-label-b')
+    overlay.removeHandle('distance-handle-p1')
+    overlay.removeHandle('distance-handle-p2')
+  }
+
+  function updateMeasurement(): void {
+    if (!pointA || !pointB) return
+
+    const dist = distance(pointA, pointB)
+    const formatted = formatDistance(dist, config.unit ?? 'm', config.precision ?? 2)
+
+    result = {
+      pointA,
+      pointB,
+      distance: dist,
+      formatted
+    }
+
+    // Update line and label
+    overlay.setMeasurement(
+      'distance-line',
+      pointA,
+      pointB,
+      dist,
+      {
+        label: formatted,
+        precision: config.precision ?? 2,
+        unit: config.unit ?? 'm'
+      }
+    )
+
+    // Update handles
+    if (enableHandles) {
+      overlay.setHandle(
+        'distance-handle-p1',
+        pointA,
+        { size: handleSize, shape: 'circle', color: '#2196F3' }
+      )
+      overlay.setHandle(
+        'distance-handle-p2',
+        pointB,
+        { size: handleSize, shape: 'circle', color: '#4CAF50' }
+      )
+    }
+
+    // Callback
+    if (onDrag) {
+      onDrag(result)
+    }
   }
 
   const self: DistanceMeasurementManager = {
@@ -139,13 +219,14 @@ export function createDistanceMeasurement(
         pointA = worldPoint
         state = MeasurementState.POINT_A
 
-        // Show Point A marker
-        overlay.setLabel(
-          'distance-label-a',
-          pointA,
-          'A',
-          { color: '#2196F3', fontSize: 14 }
-        )
+        // Show P1 handle
+        if (enableHandles) {
+          overlay.setHandle(
+            'distance-handle-p1',
+            pointA,
+            { size: handleSize, shape: 'circle', color: '#2196F3' }
+          )
+        }
       } else if (state === MeasurementState.POINT_A) {
         // Second tap - set Point B and show measurement
         pointB = worldPoint
@@ -166,9 +247,6 @@ export function createDistanceMeasurement(
           formatted
         }
 
-        // Clear Point A marker
-        overlay.removeLabel('distance-label-a')
-
         // Show distance line and label
         overlay.setMeasurement(
           'distance-line',
@@ -182,20 +260,89 @@ export function createDistanceMeasurement(
           }
         )
 
+        // Show P2 handle
+        if (enableHandles) {
+          overlay.setHandle(
+            'distance-handle-p2',
+            pointB,
+            { size: handleSize, shape: 'circle', color: '#4CAF50' }
+          )
+        }
+
         state = MeasurementState.COMPLETE
 
-        // Callback
-        if (onComplete) {
+// Callback
+        if (onComplete && result) {
           onComplete(result)
         }
+      }
+    },
 
-        // Auto-reset after short delay for fastMode
-        if (config.fastMode) {
-          setTimeout(() => {
-            self.reset()
-          }, 100)
+    onDragStart(screenPoint: Point2D): boolean {
+      if (state !== MeasurementState.COMPLETE || !enableHandles || !blockPanOnDrag) {
+        return false
+      }
+
+      const viewport = getViewport()
+      const worldPoint = screenToWorld(
+        { x: screenPoint.x, y: screenPoint.y },
+        viewport
+      )
+
+      // Hit test: check if near P1
+      if (pointA) {
+        const distA = distance(worldPoint, pointA)
+        if (distA * viewport.zoom < handleSize * 1.5) {
+          draggingHandle = 'p1'
+          state = MeasurementState.DRAGGING_P1
+          overlay.setHandleActive('distance-handle-p1', true)
+          return true
         }
       }
+
+      // Hit test: check if near P2
+      if (pointB) {
+        const distB = distance(worldPoint, pointB)
+        if (distB * viewport.zoom < handleSize * 1.5) {
+          draggingHandle = 'p2'
+          state = MeasurementState.DRAGGING_P2
+          overlay.setHandleActive('distance-handle-p2', true)
+          return true
+        }
+      }
+
+      return false
+    },
+
+    onDragMove(screenPoint: Point2D) {
+      if (!draggingHandle) return
+
+      const viewport = getViewport()
+      const worldPoint = screenToWorld(
+        { x: screenPoint.x, y: screenPoint.y },
+        viewport
+      )
+
+      if (draggingHandle === 'p1' && pointA) {
+        pointA = worldPoint
+        updateMeasurement()
+      } else if (draggingHandle === 'p2' && pointB) {
+        pointB = worldPoint
+        updateMeasurement()
+      }
+    },
+
+    onDragEnd() {
+      if (!draggingHandle) return
+
+      if (draggingHandle === 'p1') {
+        overlay.setHandleActive('distance-handle-p1', false)
+      } else if (draggingHandle === 'p2') {
+        overlay.setHandleActive('distance-handle-p2', false)
+      }
+
+      draggingHandle = null
+      state = MeasurementState.COMPLETE
     },
 
     cancel() {
@@ -203,6 +350,7 @@ export function createDistanceMeasurement(
       pointA = null
       pointB = null
       result = null
+      draggingHandle = null
       state = MeasurementState.IDLE
     },
 
@@ -211,6 +359,7 @@ export function createDistanceMeasurement(
       pointA = null
       pointB = null
       result = null
+      draggingHandle = null
       state = MeasurementState.IDLE
     }
   }
@@ -235,11 +384,14 @@ export function createDistanceMeasurement(
  * ```
  */
 export function getViewerViewport(
-  docManager: { activeLayoutView?: { internalCamera?: { zoom?: number } },
-  view?: { width?: number, height?: number, pan?: { x: number, y: number } }
+  docManager: { 
+    activeLayoutView?: { internalCamera?: { zoom?: number } },
+    view?: { width?: number, height?: number, pan?: { x: number, y: number } }
+  }
 ): ViewportState {
   const camera = docManager.activeLayoutView?.internalCamera
   const zoom = camera?.zoom ?? 1
+  const view = docManager.view
 
   return {
     zoom,

@@ -506,7 +506,7 @@
 - **Action**: Documented devicePixelRatio bug from feedback
 - **Files Changed**: TASK_LOG.md
 - **Bug Identified**:
-  14. **OverlayManager world→screen transforms don't account for devicePixelRatio**
+ 14. **OverlayManager world→screen transforms don't account for devicePixelRatio**
      - Measurement overlays on high-DPI (Retina/OLED) mobile screens
      - Will be offset by devicePixelRatio if pixel coordinates used naively
      - Most common source of "overlay doesn't align with entity I clicked" on iOS Safari
@@ -514,3 +514,26 @@
 - **Why This Approach**: Overlay misalignment on mobile
 - **Test Steps**: Add devicePixelRatio handling, test iOS Safari
 - **Risks**: Medium - Overlay misalignment on mobile
+
+### Task 33: Add Editable Measurement Endpoints
+- **Date**: 2025
+- **Action**: Added editable P1/P2 handles with drag support
+- **Files Changed**: packages/entity-model/src/distancemeasurement.ts
+- **Changes**:
+  1. Added DRAGGING_P1 and DRAGGING_P2 states
+  2. Added handleSize, enableHandles, blockPanOnDrag config options
+  3. Added onDragStart/onDragMove/onDragEnd methods
+  4. Hit-test handles first before pan
+  5. Distance updates live during drag
+  6. onDrag callback for live updates
+  7. Handle drag blocks pan when blockPanOnDrag=true
+- **Why This Approach**: Mobile needs direct handle editing, no endpoint click-to-edit
+- **Test Steps**: Test handle drag on mobile, verify distance updates live
+- **Risks**: Low - separate from viewer rendering
+
+### Task 34: Push Editable Measurement to Git
+- **Date**: 2025
+- **Action**: Commit and push measurement with editable endpoints
+- **Files Changed**: packages/entity-model/src/distancemeasurement.ts, TASK_LOG.md
+- **Commit**: "Add editable measurement endpoints - P1/P2 handles, drag, live update"
+- **Push Status**: ✅ Pushed to GitHub
