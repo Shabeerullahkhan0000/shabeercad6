@@ -219,7 +219,7 @@ private initialize() {
     })
   }
 
-  private async loadLocalFile(file: File) {
+private async loadLocalFile(file: File) {
     this.initialize()
 
     const fileName = file.name.toLowerCase()
@@ -228,10 +228,25 @@ private initialize() {
       return
     }
 
+    // Mobile memory protection - limit file size
+    const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB limit
+    if (file.size > MAX_FILE_SIZE) {
+      this.showMessage(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max 10MB.`, 'error')
+      return
+    }
+
     this.clearMessages()
+    this.showMessage('Loading file...', 'info')
+
+    // AbortController for timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000) // 60s timeout
 
     try {
-      const fileContent = await this.readFile(file)
+      // Read file with progress simulation
+      const fileContent = await this.readFileWithTimeout(file, controller.signal)
+      clearTimeout(timeoutId)
+
       const options: AcApOpenDatabaseOptions = {
         minimumChunkSize: 1000,
         mode: AcEdOpenMode.Write,
@@ -252,17 +267,27 @@ private initialize() {
         this.predefinedButtons.forEach(item => item.classList.remove('active'))
         this.showMessage(`Successfully loaded: ${file.name}`, 'success')
       } else {
-        this.showMessage(`Failed to load: ${file.name}`, 'error')
+        this.showMessage(`Failed to load: ${file.name}. File may be corrupt or incompatible.`, 'error')
       }
     } catch (error) {
-      log.error('Error loading file:', error)
-      this.showMessage(`Error loading file: ${error}`, 'error')
+      // Check for abort (timeout)
+      if (error instanceof Error && error.name === 'AbortError') {
+        this.showMessage('Loading timed out. File may be too complex or network slow.', 'error')
+      } else {
+        log.error('Error loading file:', error)
+        this.showMessage('Failed to load file. Please try a smaller file.', 'error')
+      }
     }
   }
 
-  private async loadPredefinedFile(url: string) {
+private async loadPredefinedFile(url: string) {
     this.initialize()
     this.clearMessages()
+    this.showMessage('Loading file from server...', 'info')
+
+    // Network timeout for predefined files
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout
 
     try {
       const options: AcApOpenDatabaseOptions = {
@@ -271,6 +296,7 @@ private initialize() {
       }
 
       const success = await AcApDocManager.instance.openUrl(url, options)
+      clearTimeout(timeoutId)
 
       if (success) {
         this.onFileOpened()
@@ -278,13 +304,18 @@ private initialize() {
         this.showMessage(`Successfully loaded: ${fileName}`, 'success')
       } else {
         this.showMessage(
-          `Failed to load: ${this.getFileNameFromUrl(url)}`,
+          `Failed to load: ${this.getFileNameFromUrl(url)}. Server may be slow or file unavailable.`,
           'error'
         )
       }
     } catch (error) {
-      log.error('Error loading predefined file:', error)
-      this.showMessage(`Error loading file: ${error}`, 'error')
+      clearTimeout(timeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        this.showMessage('Network timeout. Check your connection and try again.', 'error')
+      } else {
+        log.error('Error loading predefined file:', error)
+        this.showMessage(`Error loading file: ${error}`, 'error')
+      }
     }
   }
 
@@ -324,11 +355,47 @@ private initialize() {
     return paths[paths.length - 1] || url
   }
 
-  private readFile(file: File): Promise<ArrayBuffer> {
+private readFile(file: File): Promise<ArrayBuffer> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => resolve(reader.result as ArrayBuffer)
       reader.onerror = () => reject(reader.error)
+      reader.readAsArrayBuffer(file)
+    })
+  }
+
+  // Read file with abort signal for timeout
+  private async readFileWithTimeout(file: File, signal: AbortSignal): Promise<ArrayBuffer> {
+    if (signal.aborted) {
+      throw new DOMException('Aborted', 'AbortError')
+    }
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      
+      reader.onload = () => {
+        if (!signal.aborted) {
+          resolve(reader.result as ArrayBuffer)
+        }
+      }
+      
+      reader.onerror = () => {
+        if (!signal.aborted) {
+          reject(reader.error)
+        }
+      }
+      
+      // Listen for abort
+      if (signal.aborted) {
+        reject(new DOMException('Aborted', 'AbortError'))
+        return
+      }
+      
+      signal.addEventListener('abort', () => {
+        reader.abort()
+        reject(new DOMException('Aborted', 'AbortError'))
+      })
+      
       reader.readAsArrayBuffer(file)
     })
   }
