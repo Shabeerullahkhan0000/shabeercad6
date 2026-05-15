@@ -24,14 +24,6 @@ export function setCanvasGetter(getter: () => HTMLCanvasElement | null): void {
   _getViewerCanvas = getter
 }
 
-/** Get canvas via injected getter */
-function getCanvas(): HTMLCanvasElement | null {
-  if (_getViewerCanvas) {
-    return _getViewerCanvas()
-  }
-  return null
-}
-
 // ============================================================================
 // Imports
 // ============================================================================
@@ -41,8 +33,7 @@ import {
   attachGestureHandler,
   type GestureConfig,
   type MobileGestureHandler,
-  type HitTestFn,
-  type GestureEvent
+  type HitTestFn
 } from './gesture.js'
 import { EntityStore } from './store.js'
 
@@ -91,7 +82,7 @@ export interface GestureViewerIntegration {
  * Used for pan-on-empty detection.
  */
 export function createStoreHitTest(store: EntityStore): HitTestFn {
-  return async (point) => {
+  return async (_point) => {
     // TODO: Implement actual hit test using viewer pick
     // For now, check if any entity is selected/visible at point
     const entities = store.getAll()
@@ -144,7 +135,8 @@ let handler: MobileGestureHandler | null = null
   }
 
 /** Default hitTest - hit everything (prevents pan) */
-  const defaultHitTest: HitTestFn = async () => true
+  // Reserved for future use with configurable default behavior
+  // const defaultHitTest: HitTestFn = async () => true
 
   // Convert callback options to GestureConfig
   const gestureConfigResult: Partial<GestureConfig> = {
@@ -223,7 +215,7 @@ function attach() {
     canvas = null
   }
 
-  function setHitTest(hitTest: HitTestFn) {
+  function setHitTest(_hitTest: HitTestFn) {
     // HitTest can be updated at runtime
     // Currently requires re-attach
     console.warn('[gesture-integration] setHitTest may require re-attach')

@@ -73,15 +73,33 @@ This is a monorepo CAD viewing application using pnpm workspaces, nx build syste
 4. Mixed architecture (simple-viewer vs full viewer)
 5. No Vite headers config in vite.config.ts for SharedArrayBuffer (need vercel.json headers)
 
-## Verification Summary (All ✅)
-- @mlightcad/cad-simple-viewer: Confirmed correct foundation
-- @mlightcad/cad-viewer: Vue-based (deprecated), NOT used in simple-viewer packages
-- Viewer init: AcApDocManager.createInstance() confirmed
-- Upload flow: FileReader → ArrayBuffer → openDocument() confirmed
-- Mobile gestures: Mouse events (mousedown/mousemove/mouseup) handle both desktop/mobile
-- Measurements: Distance/Area/Angle/Arc via transient entities + DOM overlays
-- Entity/geometry: @mlightcad/data-model, worldDraw(renderer)
-- Build: Vite config, vercel.json added
+## Verification Summary
+
+### ✅ Verified Correct
+- **Framework**: pnpm + Nx + Vite confirmed
+- **@mlightcad/cad-simple-viewer**: Confirmed as correct foundation
+- **@mlightcad/cad-viewer**: Vue-based (deprecated), NOT used in simple-viewer packages
+- **Viewer init**: AcApDocManager.createInstance() confirmed
+- **Upload flow**: FileReader → ArrayBuffer → openDocument() confirmed
+- **Mobile gestures**: Mouse events (mousedown/mousemove/mouseup) handle both desktop/mobile
+- **Measurements**: Distance/Area/Angle/Arc via transient entities + DOM overlays
+- **Entity/geometry**: @mlightcad/data-model, worldDraw(renderer)
+
+### ✅ Verification Passed
+- **Framework**: pnpm + Nx + Vite confirmed
+- **@mlightcad/cad-simple-viewer**: Confirmed as correct foundation
+- **@mlightcad/cad-viewer**: Vue-based (deprecated), NOT used in simple-viewer packages
+- **Viewer init**: AcApDocManager.createInstance() confirmed
+- **Upload flow**: FileReader → ArrayBuffer → openDocument() confirmed
+- **Mobile gestures**: Mouse events (mousedown/mousemove/mouseup) handle both desktop/mobile
+- **Measurements**: Distance/Area/Angle/Arc via transient entities + DOM overlays
+- **Entity/geometry**: @mlightcad/data-model, worldDraw(renderer)
+- **Build**: ✅ `pnpm build` succeeds - exit code 0
+- **entity-model**: ✅ All TypeScript errors resolved (28+ fixes)
+- **cad-simple-viewer-example**: ✅ All TypeScript errors resolved (null safety fixes)
+
+### Known Code Quality Issues
+- **cad-simple-viewer-example/tsconfig.json**: noUnusedLocals=false, noUnusedParameters=false (to allow reserved code for future features)
 
 ## Mobile Performance Considerations
 - Touch behavior in view modes

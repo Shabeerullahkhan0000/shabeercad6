@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm nx run-many -t build --projects=cad-simple-viewer,cad-simple-viewer-example --parallel=false",
+  "buildCommand": "pnpm build:vercel",
   "outputDirectory": "packages/cad-simple-viewer-example/dist",
   "installCommand": "pnpm install",
   "framework": null,

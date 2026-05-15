@@ -11,26 +11,21 @@
  * - Avoids scanning all entities on every touchmove
  */
 
-import { 
-  CadEntity, 
-  CadEntityType, 
-  Point2D, 
-  Point3D, 
+import {
+  CadEntity,
+  CadEntityType,
+  Point3D,
   BoundingBox,
-  isPointInBBox,
   doBBoxesIntersect
 } from './types.js'
-import { 
-  distance2D, 
-  distance3D, 
+import {
+  distance3D,
   midpoint3D,
   nearestPointOnSegment,
-  nearestPointOnLine,
-  lineLineIntersection,
   segmentSegmentIntersection,
   toPoint3D
 } from './geometry.js'
-import { worldToScreen, screenToWorld, ViewportState } from './overlay.js'
+import { screenToWorld, ViewportState } from './overlay.js'
 
 // ============================================================================
 // Snap Types
@@ -143,7 +138,7 @@ export class SnapEngine {
     entities: CadEntity[],
     worldPoint: Point3D,
     worldTolerance: number,
-    viewport: ViewportState
+    _viewport: ViewportState
   ): CadEntity[] {
     // Create searchable bounding box around cursor
     const searchBox: BoundingBox = {
@@ -172,17 +167,17 @@ export class SnapEngine {
     worldTolerance: number,
     viewport: ViewportState
   ): SnapResult | null {
-    const { geometry, id, type } = entity
-    
+    const { id } = entity
+
     // Get all snap points for this entity based on type
     const snapPoints = this._getSnapPoints(entity)
-    
+
     let closest: SnapResult | null = null
-    
+
     for (const sp of snapPoints) {
       const worldDist = distance3D(worldPoint, sp.point)
       const screenDist = worldDist * viewport.zoom
-      
+
       // Check tolerance
       if (screenDist <= this._screenTolerance) {
         if (!closest || screenDist < closest.screenDistance) {
@@ -195,9 +190,9 @@ export class SnapEngine {
         }
       }
     }
-    
+
     // Intersection snap (special - between entities)
-    if (this._enabledModes.has(SnapMode.INTERSECTION) && type === CadEntityType.Line) {
+    if (this._enabledModes.has(SnapMode.INTERSECTION) && entity.type === CadEntityType.Line) {
       const intersection = this._findIntersection(entity, worldPoint, worldTolerance, viewport)
       if (intersection && (!closest || intersection.screenDistance < closest.screenDistance)) {
         closest = intersection
@@ -343,11 +338,11 @@ export class SnapEngine {
   private _findIntersection(
     entity: CadEntity,
     worldPoint: Point3D,
-    worldTolerance: number,
-    viewport: ViewportState
+    _worldTolerance: number,
+    _viewport: ViewportState
   ): SnapResult | null {
     if (entity.type !== CadEntityType.Line) return null
-    
+
     const line1 = entity.geometry as { start: Point3D; end: Point3D }
     const p1Start = toPoint3D(line1.start)
     const p1End = toPoint3D(line1.end)
@@ -372,7 +367,7 @@ export class SnapEngine {
       
       if (result.intersects && result.point) {
         const intersectionPoint = toPoint3D(result.point)
-        const screenDist = distance3D(worldPoint, intersectionPoint) * viewport.zoom
+        const screenDist = distance3D(worldPoint, intersectionPoint) * _viewport.zoom
         
         if (screenDist <= this._screenTolerance) {
           return {

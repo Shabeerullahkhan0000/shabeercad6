@@ -1,33 +1,27 @@
 # Next Tasks
 
-## Priority 1: Build Verification (CRITICAL)
+## Priority 1: Vercel Deployment
 
-### Task: Verify pnpm build works
-- **Why**: Ensure entity-model package compiles correctly
-- **Files**: packages/entity-model/*
+### Task: Verify live Vercel deployment after main push
+- **Why**: Ensure GitHub main triggers the Vercel build and worker assets are served
+- **Files**: vercel.json, package.json
 - **Test Steps**:
-  1. `cd cad-viewer && pnpm install`
-  2. `pnpm build` or `cd packages/entity-model && pnpm build`
-  3. Check for TypeScript errors in dist output
-- **Risk**: Medium - Need manual verification
-
-### Task: Verify Nx build includes entity-model
-- **Why**: Ensure package is in build graph
-- **Files**: nx.json, packages/entity-model/tsconfig.json
-- **Test Steps**:
-  1. `npx nx graph` to see build graph
-  2. Verify entity-model is included
-- **Risk**: Low - Graph visualization only
-
-## Priority 2: Vercel Deployment
-
-### Task: Verify Vercel deployment works
-- **Why**: Ensure build order correct for deployment
-- **Test Steps**:
-  1. Push to main branch
+  1. Push to GitHub main branch
   2. Check Vercel build logs
   3. Verify deployment succeeds
+  4. Open the deployed app and load a small DXF/DWG file
 - **Risk**: Medium - Network dependent
+
+## Priority 2: Code Quality Improvements
+
+### Task: Clean up unused code in entity-model
+- **Why**: Several utility functions are declared but never used
+- **Files**: packages/entity-model/src/*
+- **Items**:
+  - `defaultHitTest` in gesture-integration.ts (commented out)
+  - `_getViewport` in overlay-integration.ts (removed, was unused)
+  - `initError` and `retryInitialization` in main.ts (flagged by noUnusedLocals)
+- **Risk**: Low - unused code removal
 
 ---
 
@@ -49,6 +43,8 @@
 - vercel.json with Vite framework
 - COOP/COEP headers for SharedArrayBuffer
 - SPA fallback configured
+- Vercel build now uses `pnpm build:vercel`
+- Root postinstall now avoids the deprecated full monorepo build path
 
 ## Completed: Entity Model Package ✅
 - packages/entity-model created

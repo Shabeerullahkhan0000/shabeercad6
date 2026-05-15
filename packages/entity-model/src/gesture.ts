@@ -130,8 +130,7 @@ export interface MobileGestureOptions {
 export function createMobileGestureHandler(options: MobileGestureOptions = {}): MobileGestureHandler {
   const config = { ...defaultGestureConfig, ...options.config }
   const hitTest = options.hitTest
-  const element = options.element
-  
+
   let state: GestureState = GestureState.IDLE
   let startPoint: Point2D | null = null
   let lastPoint: Point2D | null = null
@@ -275,7 +274,7 @@ export function createMobileGestureHandler(options: MobileGestureOptions = {}): 
       }
     },
     
-    onTouchEnd(e: TouchEvent) {
+    onTouchEnd(_e: TouchEvent) {
       if (!enabled) return
       
       if (state === GestureState.TOUCH_START && startPoint && config.enableTap) {

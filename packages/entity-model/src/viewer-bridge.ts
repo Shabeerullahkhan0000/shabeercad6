@@ -7,8 +7,7 @@
  * Mobile-optimized: does not rerender full viewer, just highlights.
  */
 
-import { EntityStore, SelectionChangeEvent, createSelectionChangeEvent } from './store.js'
-import { CadEntity } from './types.js'
+import { EntityStore } from './store.js'
 
 // ============================================================================
 // Viewer Bridge

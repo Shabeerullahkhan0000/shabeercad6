@@ -14,10 +14,9 @@
 
 import { Point2D, Point3D } from './types.js'
 import { distance } from './geometry.js'
-import { 
-  worldToScreen, 
-  screenToWorld, 
-  OverlayManager, 
+import {
+  screenToWorld,
+  OverlayManager,
   ViewportState
 } from './overlay.js'
 

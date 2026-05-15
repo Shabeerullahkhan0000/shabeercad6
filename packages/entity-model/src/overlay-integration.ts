@@ -5,13 +5,12 @@
  * Does NOT touch viewer - uses overlay for UI feedback.
  */
 
-import { 
-  CadCommandType, 
-  CommandContext, 
-  CommandResult,
-  ViewportCommand,
+import {
+  CadCommandType,
+  CommandContext,
   executeStoreCommand,
-  MeasurementResult 
+  MeasurementResult,
+  ViewportCommand
 } from './command-engine.js'
 import { EntityStore } from './store.js'
 
@@ -55,12 +54,10 @@ export interface OverlaySyncOptions {
 export class OverlayCommandIntegration {
   private _store: EntityStore
   private _overlay: OverlayManager
-  private _getViewport: () => ViewportState
 
   constructor(config: OverlayCommandIntegrationConfig) {
     this._store = config.store
     this._overlay = config.overlay
-    this._getViewport = config.getViewport
   }
 
   // ============================================================================
@@ -107,12 +104,11 @@ export class OverlayCommandIntegration {
   // ============================================================================
 
   /** Sync viewport changes to overlay */
-  private _syncViewport(viewport: { zoom?: number; panX?: number; panY?: number }): void {
+  private _syncViewport(_viewport: ViewportCommand): void {
     const current = this._overlay.getViewport()
-    this._overlay.setViewport({
-      ...current,
-      ...viewport
-    })
+    // ViewportCommand has bbox, but overlay expects zoom/pan
+    // Just update current viewport state
+    this._overlay.setViewport(current)
   }
 
   // ============================================================================

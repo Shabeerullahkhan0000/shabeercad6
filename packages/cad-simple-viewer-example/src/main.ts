@@ -43,6 +43,9 @@ class CadViewerApp {
   private isInitializing: boolean = false
   private hasOpenedFile: boolean = false
   private hasLoadedDocument: boolean = false
+  private initError: Error | null = null
+  private abortController: AbortController | null = null
+  private visibilityAbortController: AbortController | null = null
 
   constructor() {
     // SSR guard - only run in browser
@@ -52,22 +55,59 @@ class CadViewerApp {
 
     // Lazy DOM setup - fetch elements only when needed
     this.lazySetupDOM()
+    this.setupVisibilityHandling()
+    this.setupPageCleanup()
+  }
+
+  private setupVisibilityHandling() {
+    // Mobile frozen screen risk: Pause rendering when tab is hidden
+    this.visibilityAbortController = new AbortController()
+    const signal = this.visibilityAbortController.signal
+
+    const handleVisibilityChange = () => {
+      if (document.hidden && this.isInitialized) {
+        // Pause heavy operations when tab is hidden on mobile
+        try {
+          AcApDocManager.instance.curView.clear()
+        } catch {
+          // Ignore if instance not available
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange, { signal })
+  }
+
+  private setupPageCleanup() {
+    // Cleanup on page unload to prevent mobile frozen screens
+    const cleanup = () => {
+      if (this.isInitialized && AcApDocManager.instance) {
+        // Use fire-and-forget to avoid blocking page unload
+        AcApDocManager.instance.destroy().catch(() => {
+          // Ignore cleanup errors during unload
+        })
+      }
+    }
+
+    window.addEventListener('beforeunload', cleanup)
+    // Also handle pagehide for mobile Safari/iOS
+    window.addEventListener('pagehide', cleanup)
   }
 
   private lazySetupDOM() {
-    this.container = document.getElementById('cad-container')
-    this.fileInput = document.getElementById('fileInputElement')
-    this.centerOpenButton = document.getElementById('centerOpenButton')
-    this.toolbarOpenButton = document.getElementById('toolbarOpenButton')
-    this.toolbarZoomButton = document.getElementById('toolbarZoomButton')
-    this.toolbarZoomWindowButton = document.getElementById('toolbarZoomWindowButton')
-    this.toolbarBgButton = document.getElementById('toolbarBgButton')
-    this.toolbarPickboxButton = document.getElementById('toolbarPickboxButton')
-    this.toolbarLineWeightButton = document.getElementById('toolbarLineWeightButton')
-    this.emptyState = document.getElementById('emptyState')
+    this.container = document.getElementById('cad-container') as HTMLDivElement | null
+    this.fileInput = document.getElementById('fileInputElement') as HTMLInputElement | null
+    this.centerOpenButton = document.getElementById('centerOpenButton') as HTMLButtonElement | null
+    this.toolbarOpenButton = document.getElementById('toolbarOpenButton') as HTMLButtonElement | null
+    this.toolbarZoomButton = document.getElementById('toolbarZoomButton') as HTMLButtonElement | null
+    this.toolbarZoomWindowButton = document.getElementById('toolbarZoomWindowButton') as HTMLButtonElement | null
+    this.toolbarBgButton = document.getElementById('toolbarBgButton') as HTMLButtonElement | null
+    this.toolbarPickboxButton = document.getElementById('toolbarPickboxButton') as HTMLButtonElement | null
+    this.toolbarLineWeightButton = document.getElementById('toolbarLineWeightButton') as HTMLButtonElement | null
+    this.emptyState = document.getElementById('emptyState') as HTMLDivElement | null
     this.predefinedButtons = document.querySelectorAll(
       '#predefinedFileList .file-list-item'
-    )
+    ) as unknown as NodeListOf<HTMLButtonElement> | null
 
     this.setupFileHandling()
     this.setupToolbarActions()
@@ -88,21 +128,30 @@ private initialize() {
       return
     }
 
+    // Guard: verify container is still in DOM
+    if (!document.body.contains(this.container)) {
+      this.showMessage('CAD container removed from page', 'error')
+      return
+    }
+
     this.isInitializing = true
     this.showMessage('Loading CAD viewer...', 'info')
 
     try {
-      AcApDocManager.createInstance({
-        container: this.container,
-        autoResize: true,
-        baseUrl: 'https://cdn.jsdelivr.net/gh/mlightcad/cad-data@main/',
-        commandAliases: EXAMPLE_COMMAND_ALIASES,
-        webworkerFileUrls: {
-          mtextRender: './workers/mtext-renderer-worker.js',
-          dxfParser: './workers/dxf-parser-worker.js',
-          dwgParser: './workers/libredwg-parser-worker.js'
-        }
-      })
+      // Check if instance already exists (defensive guard)
+      if (!AcApDocManager.instance) {
+        AcApDocManager.createInstance({
+          container: this.container,
+          autoResize: true,
+          baseUrl: 'https://cdn.jsdelivr.net/gh/mlightcad/cad-data@main/',
+          commandAliases: EXAMPLE_COMMAND_ALIASES,
+          webworkerFileUrls: {
+            mtextRender: './workers/mtext-renderer-worker.js',
+            dxfParser: './workers/dxf-parser-worker.js',
+            dwgParser: './workers/libredwg-parser-worker.js'
+          }
+        })
+      }
 
       AcApDocManager.instance.events.documentActivated.addEventListener(
         args => {
@@ -111,98 +160,153 @@ private initialize() {
       )
 
       this.isInitialized = true
+      this.initError = null
       this.clearMessages()
       this.showMessage('CAD viewer ready', 'success')
     } catch (error) {
       log.error('Failed to initialize CAD viewer:', error)
+      this.initError = error instanceof Error ? error : new Error(String(error))
       this.showMessage('Failed to initialize CAD viewer', 'error')
     } finally {
       this.isInitializing = false
     }
   }
 
-  private setupFileHandling() {
+  /** Force re-initialization after failed init */
+  private retryInitialization() {
+    // Reset state to allow retry
+    this.isInitialized = false
+    this.isInitializing = false
+    this.initError = null
+    this.initialize()
+  }
+
+private setupFileHandling() {
+    if (!this.fileInput) return
     this.fileInput.addEventListener('change', event => {
       const file = (event.target as HTMLInputElement).files?.[0]
       if (file) {
         void this.loadLocalFile(file)
       }
-      this.fileInput.value = ''
+      if (this.fileInput) this.fileInput.value = ''
     })
 
-    this.centerOpenButton.addEventListener('click', () => {
-      this.fileInput.click()
-    })
+    if (this.centerOpenButton) {
+      this.centerOpenButton.addEventListener('click', () => {
+        this.cancelPendingLoad()
+        this.fileInput?.click()
+      })
+    }
 
-    this.toolbarOpenButton.addEventListener('click', () => {
-      this.fileInput.click()
+    if (this.toolbarOpenButton) {
+      this.toolbarOpenButton.addEventListener('click', () => {
+        this.cancelPendingLoad()
+        this.fileInput?.click()
+      })
+    }
+  }
+
+  /** Cancel any pending file load operation */
+  private cancelPendingLoad() {
+    if (this.abortController) {
+      this.abortController.abort()
+      this.abortController = null
+    }
+  }
+
+  /** Set loading state - disable buttons during load */
+  private setLoadingState(loading: boolean) {
+    const buttons = [
+      this.centerOpenButton,
+      this.toolbarOpenButton,
+      this.toolbarZoomButton,
+      this.toolbarZoomWindowButton,
+      this.toolbarBgButton,
+      this.toolbarPickboxButton,
+      this.toolbarLineWeightButton
+    ]
+    buttons.forEach(btn => {
+      if (btn) {
+        btn.disabled = loading
+      }
     })
   }
 
   private setupToolbarActions() {
-    this.toolbarZoomButton.addEventListener('click', () => {
-      if (!this.hasLoadedDocument || !this.isInitialized) {
-        return
-      }
-      AcApDocManager.instance.sendStringToExecute('zoom\\nall')
-    })
+    if (this.toolbarZoomButton) {
+      this.toolbarZoomButton.addEventListener('click', () => {
+        if (!this.hasLoadedDocument || !this.isInitialized) {
+          return
+        }
+        AcApDocManager.instance.sendStringToExecute('zoom\\nall')
+      })
+    }
 
-    this.toolbarZoomWindowButton.addEventListener('click', () => {
-      if (!this.hasLoadedDocument || !this.isInitialized) {
-        return
-      }
-      AcApDocManager.instance.sendStringToExecute('zoom\\nwindow')
-    })
+    if (this.toolbarZoomWindowButton) {
+      this.toolbarZoomWindowButton.addEventListener('click', () => {
+        if (!this.hasLoadedDocument || !this.isInitialized) {
+          return
+        }
+        AcApDocManager.instance.sendStringToExecute('zoom\\nwindow')
+      })
+    }
 
-    this.toolbarBgButton.addEventListener('click', () => {
-      if (!this.hasLoadedDocument || !this.isInitialized) {
-        return
-      }
-      AcApDocManager.instance.sendStringToExecute('switchbg')
-    })
+    if (this.toolbarBgButton) {
+      this.toolbarBgButton.addEventListener('click', () => {
+        if (!this.hasLoadedDocument || !this.isInitialized) {
+          return
+        }
+        AcApDocManager.instance.sendStringToExecute('switchbg')
+      })
+    }
 
-    this.toolbarPickboxButton.addEventListener('click', () => {
-      if (!this.hasLoadedDocument || !this.isInitialized) {
-        return
-      }
+    if (this.toolbarPickboxButton) {
+      this.toolbarPickboxButton.addEventListener('click', () => {
+        if (!this.hasLoadedDocument || !this.isInitialized) {
+          return
+        }
 
-      const currentPickbox = AcDbSysVarManager.instance().getVar(
-        AcDbSystemVariables.PICKBOX,
-        AcApDocManager.instance.curDocument.database
-      )
-      const initialPickbox =
-        currentPickbox == null ? '10' : String(currentPickbox)
-      const valueText = window.prompt(
-        'Set pick box size (integer):',
-        initialPickbox
-      )
-      if (valueText == null) {
-        return
-      }
+        const currentPickbox = AcDbSysVarManager.instance().getVar(
+          AcDbSystemVariables.PICKBOX,
+          AcApDocManager.instance.curDocument.database
+        )
+        const initialPickbox =
+          currentPickbox == null ? '10' : String(currentPickbox)
+        const valueText = window.prompt(
+          'Set pick box size (integer):',
+          initialPickbox
+        )
+        if (valueText == null) {
+          return
+        }
 
-      const pickboxValue = Number.parseInt(valueText, 10)
-      if (!Number.isFinite(pickboxValue) || pickboxValue <= 0) {
-        this.showMessage('Pickbox size must be a positive integer', 'error')
-        return
-      }
+        const pickboxValue = Number.parseInt(valueText, 10)
+        if (!Number.isFinite(pickboxValue) || pickboxValue <= 0) {
+          this.showMessage('Pickbox size must be a positive integer', 'error')
+          return
+        }
 
-      AcApDocManager.instance.sendStringToExecute(
-        `${AcDbSystemVariables.PICKBOX}\n${pickboxValue}`
-      )
-      this.showMessage(`Pickbox set to: ${pickboxValue}`, 'success')
-    })
+        AcApDocManager.instance.sendStringToExecute(
+          `${AcDbSystemVariables.PICKBOX}\n${pickboxValue}`
+        )
+        this.showMessage(`Pickbox set to: ${pickboxValue}`, 'success')
+      })
+    }
 
-    this.toolbarLineWeightButton.addEventListener('click', () => {
-      if (!this.hasLoadedDocument || !this.isInitialized) {
-        return
-      }
-      const db = AcApDocManager.instance.curDocument.database
-      db.lwdisplay = !db.lwdisplay
-      this.updateLineWeightButtonLabel()
-    })
+    if (this.toolbarLineWeightButton) {
+      this.toolbarLineWeightButton.addEventListener('click', () => {
+        if (!this.hasLoadedDocument || !this.isInitialized) {
+          return
+        }
+        const db = AcApDocManager.instance.curDocument.database
+        db.lwdisplay = !db.lwdisplay
+        this.updateLineWeightButtonLabel()
+      })
+    }
   }
 
   private setupPredefinedFileActions() {
+    if (!this.predefinedButtons) return
     this.predefinedButtons.forEach(button => {
       button.addEventListener('click', () => {
         const url = button.dataset.fileUrl
@@ -212,7 +316,7 @@ private initialize() {
         // Hide empty-state open button as soon as a predefined file is selected.
         this.hasOpenedFile = true
         this.updateEmptyStateVisibility()
-        this.predefinedButtons.forEach(item => item.classList.remove('active'))
+        this.predefinedButtons?.forEach(item => item.classList.remove('active'))
         button.classList.add('active')
         void this.loadPredefinedFile(url)
       })
@@ -235,11 +339,16 @@ private async loadLocalFile(file: File) {
       return
     }
 
+    // Cancel any previous pending load
+    this.cancelPendingLoad()
+    this.setLoadingState(true)
+
     this.clearMessages()
     this.showMessage('Loading file...', 'info')
 
     // AbortController for timeout
-    const controller = new AbortController()
+    this.abortController = new AbortController()
+    const controller = this.abortController
     const timeoutId = setTimeout(() => controller.abort(), 60000) // 60s timeout
 
     try {
@@ -264,7 +373,7 @@ private async loadLocalFile(file: File) {
 
       if (success) {
         this.onFileOpened()
-        this.predefinedButtons.forEach(item => item.classList.remove('active'))
+        this.predefinedButtons?.forEach(item => item.classList.remove('active'))
         this.showMessage(`Successfully loaded: ${file.name}`, 'success')
       } else {
         this.showMessage(`Failed to load: ${file.name}. File may be corrupt or incompatible.`, 'error')
@@ -277,16 +386,24 @@ private async loadLocalFile(file: File) {
         log.error('Error loading file:', error)
         this.showMessage('Failed to load file. Please try a smaller file.', 'error')
       }
+    } finally {
+      this.setLoadingState(false)
     }
   }
 
 private async loadPredefinedFile(url: string) {
     this.initialize()
+
+    // Cancel any previous pending load
+    this.cancelPendingLoad()
+    this.setLoadingState(true)
+
     this.clearMessages()
     this.showMessage('Loading file from server...', 'info')
 
     // Network timeout for predefined files
-    const controller = new AbortController()
+    this.abortController = new AbortController()
+    const controller = this.abortController
     const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout
 
     try {
@@ -316,6 +433,8 @@ private async loadPredefinedFile(url: string) {
         log.error('Error loading predefined file:', error)
         this.showMessage(`Error loading file: ${error}`, 'error')
       }
+    } finally {
+      this.setLoadingState(false)
     }
   }
 
@@ -327,19 +446,22 @@ private async loadPredefinedFile(url: string) {
   }
 
   private updateEmptyStateVisibility() {
-    this.emptyState.classList.toggle('hidden', this.hasOpenedFile)
+    if (this.emptyState) this.emptyState.classList.toggle('hidden', this.hasOpenedFile)
   }
 
   private updateToolbarButtonsState() {
-    this.toolbarZoomButton.disabled = !this.hasLoadedDocument
-    this.toolbarZoomWindowButton.disabled = !this.hasLoadedDocument
-    this.toolbarBgButton.disabled = !this.hasLoadedDocument
-    this.toolbarPickboxButton.disabled = !this.hasLoadedDocument
-    this.toolbarLineWeightButton.disabled = !this.hasLoadedDocument
+    if (this.toolbarZoomButton) this.toolbarZoomButton.disabled = !this.hasLoadedDocument
+    if (this.toolbarZoomWindowButton) this.toolbarZoomWindowButton.disabled = !this.hasLoadedDocument
+    if (this.toolbarBgButton) this.toolbarBgButton.disabled = !this.hasLoadedDocument
+    if (this.toolbarPickboxButton) this.toolbarPickboxButton.disabled = !this.hasLoadedDocument
+    if (this.toolbarLineWeightButton) this.toolbarLineWeightButton.disabled = !this.hasLoadedDocument
     this.updateLineWeightButtonLabel()
   }
 
-  private updateLineWeightButtonLabel() {
+private updateLineWeightButtonLabel() {
+    if (!this.toolbarLineWeightButton) {
+      return
+    }
     const showLineWeight =
       this.hasLoadedDocument && this.isInitialized
         ? AcApDocManager.instance.curDocument.database.lwdisplay
@@ -353,15 +475,6 @@ private async loadPredefinedFile(url: string) {
   private getFileNameFromUrl(url: string) {
     const paths = url.split('/')
     return paths[paths.length - 1] || url
-  }
-
-private readFile(file: File): Promise<ArrayBuffer> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as ArrayBuffer)
-      reader.onerror = () => reject(reader.error)
-      reader.readAsArrayBuffer(file)
-    })
   }
 
   // Read file with abort signal for timeout
