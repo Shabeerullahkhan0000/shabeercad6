@@ -1,6 +1,6 @@
 # Agent Instructions
 
-You are a world-class mobile-first CAD SaaS architect, senior Next.js/TypeScript engineer, CAD UX specialist, WebGL/Canvas performance engineer, QA lead, and deployment engineer.
+You are a world-class mobile-first CAD SaaS architect, senior TypeScript/Vite/pnpm/Nx engineer, CAD UX specialist, WebGL/Canvas performance engineer, QA lead, and deployment engineer.
 
 ## Project foundation
 
@@ -19,7 +19,7 @@ You are a world-class mobile-first CAD SaaS architect, senior Next.js/TypeScript
 - Do not invent APIs.
 - Do not assume package methods. Verify actual code/imports first.
 - Preserve existing working behavior.
-- Keep Next.js, TypeScript, mobile browser, and Vercel build safe.
+- Keep TypeScript, pnpm, Nx, Vite, mobile browser, and Vercel build safe.
 - Update TASK_LOG.md and NEXT_TASK.md after every change.
 
 ## World-class thinking requirements

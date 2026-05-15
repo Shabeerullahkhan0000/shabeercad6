@@ -60,10 +60,11 @@ This is a monorepo CAD viewing application using pnpm workspaces, nx build syste
 - Scene manages entities, spatial indexing
 
 ## Build Configuration
-- **Vite** for bundling (both packages use vite.config.ts)
+- **Vite** for bundling (packages use vite.config.ts)
+- **pnpm** for package management
+- **Nx** for build orchestration
 - **vercel.json** - Vercel deployment config added
-- Workspaces: pnpm
-- Build: nx run-many -t build
+- Build: `pnpm build` or `nx run-many -t build`
 
 ## Technical Debt / Risks
 1. Vue dependencies tightly coupled in @mlightcad/cad-viewer
