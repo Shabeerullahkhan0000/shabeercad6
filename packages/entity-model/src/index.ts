@@ -35,3 +35,6 @@ export * from './gesture.js'
 
 // Gesture + Viewer Integration
 export * from './gesture-integration.js'
+
+// Distance Measurement
+export * from './distancemeasurement.js'

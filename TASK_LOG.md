@@ -334,3 +334,183 @@
 - **Test Steps**: Attach to viewer, test tap/pan on mobile
 - **Risks**: Low - separate module, callbacks only
 - **Next Task**: Test integration
+
+### Task 21: Basic Two-Point Distance Measurement
+- **Date**: 2024
+- **Action**: Implemented basic two-point distance measurement in entity-model
+- **Files Changed**: packages/entity-model/src/distancemeasurement.ts, packages/entity-model/src/index.ts
+- **Changes**:
+  1. MeasurementState: IDLE, POINT_A, COMPLETE
+  2. DistanceMeasurementResult: pointA, pointB, distance, formatted
+  3. DistanceMeasurementConfig: overlay, getViewport, onComplete, unit, precision, fastMode
+  4. createDistanceMeasurement(): Manager factory
+   5. Mobile-first: tap Point A → tap Point B → show line/distance
+  6. No live preview after Point A (shows marker immediately)
+  7. fastMode: auto-reset after 100ms for quick next measurement
+  8. Unit support: mm, cm, m, in, ft
+  9. getViewerViewport(): Helper to get viewport state from cad-simple-viewer
+- **Why This Approach**: Pure overlay layer, does NOT mutate viewer
+- **Test Steps**: Test tap A, tap B, verify distance displays correctly
+- **Risks**: Low - overlay only, no viewer changes
+
+### Task 22: Document Critical Bugs Affecting Measurement
+- **Date**: 2024
+- **Action**: Documented critical bugs from roadmap feedback
+- **Files Changed**: TASK_LOG.md
+- **Bugs Identified**:
+  1. **SNAP system typo** - "Endpoint: Now working for INSERT entity yet." should be "Not"
+     - Impact: Endpoint snap on INSERT entities is broken
+     - Why it matters: INSERT (blocks) are extremely common in contractor DWG files
+     - Blocks precise measurement when trying to snap to block endpoints
+  2. **objectId === handle** - Data model integrity bug
+     - Currently objectId is same as handle, stored as string instead of bigint (int64)
+     - Impact: String-based ID comparisons produce wrong results ("10" > "9" is true in string, false in numeric)
+     - Affects: AI command layer, EntityStore numeric sorting/range queries
+- **Why This Approach**: Required to document known issues affecting measurement
+- **Test Steps**: Test endpoint snap on INSERT entities, test ID comparisons
+- **Risks**: High - These are external data-model bugs
+
+### Task 23: Document Critical Bugs Affecting DWG Loading
+- **Date**: 2024
+- **Action**: Documented worker path bug from feedback
+- **Files Changed**: TASK_LOG.md
+- **Bug Identified**:
+  3. **Worker paths on Vercel unverified**
+     - NEXT_TASK.md: "Worker paths configured - may need adjustment after first deploy"
+     - PROJECT_CONTEXT.md: "Worker paths may need adjustment for Vercel edge"
+     - Impact: WASM parsing (DWG loading pipeline) could silently 404 in production
+     - No automated test catching this
+- **Why This Approach**: Critical production bug affecting DWG file loading
+- **Test Steps**: Deploy to Vercel, verify DWG files load correctly
+- **Risks**: Critical - All DWG loading could fail in production
+
+### Task 24: Document CI/CD and Deployment Bugs
+- **Date**: 2024
+- **Action**: Documented CI/CD and deployment bugs from feedback
+- **Files Changed**: TASK_LOG.md
+- **Bugs Identified**:
+  4. **.gitlab-ci.yml is dead in a GitHub repo**
+     - GitLab CI config in a GitHub repo never runs
+     - Zero GitHub Actions workflows in .github/
+     - Impact: No automated build checks, no test runs on PR, no deployment gate
+     - AI agent push could silently break the build
+  5. **SharedArrayBuffer depends entirely on one deploy target**
+     - COOP/COEP headers only in vercel.json
+     - Not in vite.config.ts for dev/preview
+     - If preview locally without Vercel CLI, or deploy to Netlify/Cloudflare Pages
+     - Impact: DWG loading crashes with crossOriginIsolated error
+- **Why This Approach**: Critical deployment/CI issues
+- **Test Steps**: Add GitHub Actions workflow, add headers to vite.config.ts
+- **Risks**: High - No CI, deployment fragile
+
+### Task 25: Document Deprecated Package Isolation Bug
+- **Date**: 2024
+- **Action**: Documented deprecated package risk from feedback
+- **Files Changed**: TASK_LOG.md
+- **Bug Identified**:
+  6. **cad-viewer-example deprecated package still in monorepo**
+     - PROJECT_CONTEXT.md: "cad-viewer-example: Vue example using cad-viewer — DEPRECATED - DO NOT USE"
+     - Still in packages/ folder
+     - AI agent could accidentally import from it
+     - It requires Vue, but you're Vue-free
+     - Compile passes but runtime breaks
+- **Why This Approach**: Risk of shipping broken runtime
+- **Test Steps**: Delete or move to deprecated/ folder with warning
+- **Risks**: Medium - Could ship broken runtime
+
+### Task 26: Document Social Links and Demo Bug
+- **Date**: 2024
+- **Action**: Documented social links bug from feedback
+- **Files Changed**: TASK_LOG.md
+- **Bug Identified**:
+  7. **README.md points to upstream social links**
+     - Twitter @mlightcad, YouTube @mlightcad, Medium @mlightcad
+     - These are original authors' accounts — not yours
+     - "Live Demo" link points to mlightcad.github.io, not your Vercel
+- **Why This Approach**: Users get sent to competitor
+- **Test Steps**: Update README with your social links and Vercel URL
+- **Risks**: Medium - Branding confusion
+
+### Task 27: Document Task Clarity Bug
+- **Date**: 2024
+- **Action**: Documented task clarity issue from feedback
+- **Files Changed**: TASK_LOG.md
+- **Bug Identified**:
+  8. **NEXT_TASK.md pending tasks lack blocking status**
+     - Mobile touch optimization (Priority 1)
+     - Measurement overlay alignment (Priority 2)
+     - Neither has "blocked by X" note
+     - Creates confusion: deferred intentionally or forgotten?
+- **Why This Approach**: Agents may skip them
+- **Test Steps**: Add blocking note or mark complete/deferred
+- **Risks**: Low - Clarity issue
+
+### Task 28: Document Viewer Error Boundary Bug
+- **Date**: 2024
+- **Action**: Documented viewer error boundary bug from feedback
+- **Files Changed**: TASK_LOG.md
+- **Bug Identified**:
+  10. **No error boundary on viewer initialization**
+     - NEXT_TASK.md: "Stabilize CAD Viewer Initialization" complete with SSR guard
+     - But no runtime error boundary
+     - If openDocument() throws mid-parse (corrupt DWG, wrong LibreDWG version)
+     - Viewer silently freezes with no user feedback
+- **Why This Approach**: Silent failures, no user visibility
+- **Test Steps**: Add try/catch wrapping parse-render pipeline with visible error state
+- **Risks**: Medium - Corrupt files freeze viewer silently
+
+### Task 29: Document Gesture Handler Cleanup Bug
+- **Date**: 2024
+- **Action**: Documented gesture handler cleanup bug from feedback
+- **Files Changed**: TASK_LOG.md
+- **Bug Identified**:
+  11. **Gesture handler has no cleanup verification**
+     - GestureViewerIntegration has attach/detach methods
+     - But if viewer is unmounted without calling detach()
+     - Ghost event listeners accumulate on canvas element
+     - Memory leak + duplicate gesture events on re-mount
+     - Silent and brutal on mobile
+- **Why This Approach**: Memory leak, silent behavior
+- **Test Steps**: Add detach verification, test SPA navigation/hot reload
+- **Risks**: Medium - Memory leak on unmount
+
+### Task 30: Document File Upload Error State Bug
+- **Date**: 2024
+- **Action**: Documented file upload error state bug from feedback
+- **Files Changed**: TASK_LOG.md
+- **Bug Identified**:
+  12. **No error state displayed when file upload fails**
+     - NEXT_TASK.md: Upload/loading flow inspected
+     - But no error state displayed when file upload/parsing fails
+     - No "Upload failed, try another file" UI
+     - Corrupt files silently freeze the viewer
+- **Why This Approach**: Silent failures, no user visibility
+- **Test Steps**: Add error state UI, test corrupt file uploads
+- **Risks**: Medium - Corrupt files show no feedback
+
+### Task 31: Document Undo/Redo Missing Bug
+- **Date**: 2024
+- **Action**: Documented undo/redo missing bug from feedback
+- **Files Changed**: TASK_LOG.md
+- **Bug Identified**:
+  13. **No undo/redo system**
+     - Entity-model package has command engine
+     - But no undo/redo system
+     - If user selects wrong entity, no way to undo
+- **Why This Approach**: User experience issue
+- **Test Steps**: Add undo/redo to command engine
+- **Risks**: Low - Missing feature
+
+### Task 32: Document devicePixelRatio Missing Bug
+- **Date**: 2024
+- **Action**: Documented devicePixelRatio bug from feedback
+- **Files Changed**: TASK_LOG.md
+- **Bug Identified**:
+  14. **OverlayManager world→screen transforms don't account for devicePixelRatio**
+     - Measurement overlays on high-DPI (Retina/OLED) mobile screens
+     - Will be offset by devicePixelRatio if pixel coordinates used naively
+     - Most common source of "overlay doesn't align with entity I clicked" on iOS Safari
+     - worldToScreen should divide by window.devicePixelRatio after converting to CSS pixels
+- **Why This Approach**: Overlay misalignment on mobile
+- **Test Steps**: Add devicePixelRatio handling, test iOS Safari
+- **Risks**: Medium - Overlay misalignment on mobile
