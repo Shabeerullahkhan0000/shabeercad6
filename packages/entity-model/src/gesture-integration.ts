@@ -7,9 +7,35 @@
  * - Attaches mobile gesture handler to CAD viewer canvas
  * - Provides hitTest callback for pan-on-empty detection
  * - Keeps gesture logic separate from viewer
+ * 
+ * IMPORTANT: This module uses injection pattern to avoid importing viewer internals.
+ * The caller must provide a canvas getter function from the application layer.
  */
 
-import { AcApDocManager } from '@mlightcad/cad-simple-viewer'
+// ============================================================================
+// Viewer Instance Getter (injection pattern)
+// ============================================================================
+
+/** Callback to get the viewer canvas - set by application */
+let _getViewerCanvas: (() => HTMLCanvasElement | null) | null = null
+
+/** Set the canvas getter - must be called by application before use */
+export function setCanvasGetter(getter: () => HTMLCanvasElement | null): void {
+  _getViewerCanvas = getter
+}
+
+/** Get canvas via injected getter */
+function getCanvas(): HTMLCanvasElement | null {
+  if (_getViewerCanvas) {
+    return _getViewerCanvas()
+  }
+  return null
+}
+
+// ============================================================================
+// Imports
+// ============================================================================
+
 import {
   createMobileGestureHandler,
   attachGestureHandler,
@@ -18,11 +44,6 @@ import {
   type HitTestFn,
   type GestureEvent
 } from './gesture.js'
-import {
-  createViewerBridge,
-  type SimpleViewerBridgeOptions,
-  type EntityViewerBridge
-} from './viewer-bridge.js'
 import { EntityStore } from './store.js'
 
 /**
@@ -31,8 +52,6 @@ import { EntityStore } from './store.js'
 export interface GestureViewerIntegrationOptions {
   /** Gesture handler config */
   gestureConfig?: Partial<GestureConfig>
-  /** Viewer bridge options */
-  bridgeOptions?: SimpleViewerBridgeOptions
   /** Entity store for hitTest */
   store?: EntityStore
   /** Callback when tap occurs */
@@ -112,57 +131,57 @@ export function createGestureViewerIntegration(
   } = options
 
 let handler: MobileGestureHandler | null = null
-  let bridge: EntityViewerBridge | null = null
   let attached = false
   let canvas: HTMLCanvasElement | null = null
 
-  /** Get canvas from viewer instance */
+  /** Get canvas via injected getter */
   function getCanvas(): HTMLCanvasElement | null {
-    try {
-      const instance = AcApDocManager.instance
-      if (!instance) return null
-      
-      const layout = instance.layoutManager?.activeLayout
-      if (!layout) return null
-      
-      const view = layout.view
-      if (!view) return null
-      
-      return view.canvas ?? null
-    } catch {
-      return null
+    // Use the injected getter (setCanvasGetter) instead of direct viewer import
+    if (_getViewerCanvas) {
+      return _getViewerCanvas()
     }
+    return null
   }
 
-  /** Default hitTest - hit everything (prevents pan) */
+/** Default hitTest - hit everything (prevents pan) */
   const defaultHitTest: HitTestFn = async () => true
 
-  handler = createMobileGestureHandler({
+  // Convert callback options to GestureConfig
+  const gestureConfigResult: Partial<GestureConfig> = {
     ...gestureConfig,
-    onTap: onTap
-      ? (point) => onTap(point)
-      : undefined,
-    onPanStart: onPanStart
-      ? (point) => onPanStart(point)
-      : undefined,
-    onPanMove: onPanMove
-      ? (delta) => onPanMove(delta)
-      : undefined,
-    onPanEnd: onPanEnd
-      ? () => onPanEnd()
-      : undefined,
-    onPinchStart: onPinchStart
-      ? (center) => onPinchStart(center)
-      : undefined,
-    onPinchMove: onPinchMove
-      ? (scale, center) => onPinchMove(scale, center)
-      : undefined,
-    onPinchEnd: onPinchEnd
-      ? () => onPinchEnd()
-      : undefined
+    enableTap: gestureConfig?.enableTap ?? true,
+    enablePanOnEmpty: gestureConfig?.enablePanOnEmpty ?? true,
+    tapThreshold: gestureConfig?.tapThreshold ?? 10,
+    panThreshold: gestureConfig?.panThreshold ?? 10,
+    throttleMs: gestureConfig?.throttleMs ?? 0
+  }
+
+  handler = createMobileGestureHandler({
+    config: gestureConfigResult
   })
 
-  function attach() {
+  // Subscribe to gesture events and forward to callbacks
+  if (handler) {
+    handler.on((event) => {
+      if (event.type === 'tap' && onTap) {
+        onTap(event.point)
+      } else if (event.type === 'pan_start' && onPanStart) {
+        onPanStart(event.point)
+      } else if (event.type === 'pan_move' && onPanMove) {
+        onPanMove(event.delta!)
+      } else if (event.type === 'pan_end' && onPanEnd) {
+        onPanEnd()
+      } else if (event.type === 'pinch_start' && onPinchStart) {
+        onPinchStart(event.point)
+      } else if (event.type === 'pinch_move' && onPinchMove) {
+        onPinchMove(event.scale!, event.point)
+      } else if (event.type === 'pinch_end' && onPinchEnd) {
+        onPinchEnd()
+      }
+    })
+  }
+
+function attach() {
     if (attached) return
     
     canvas = getCanvas()
@@ -171,16 +190,8 @@ let handler: MobileGestureHandler | null = null
       return
     }
 
-    attachGestureHandler(handler, canvas, {
-      hitTest: gestureConfig?.enablePanOnEmpty !== false 
-        ? defaultHitTest 
-        : undefined
-    })
-
-    // Create viewer bridge if options provided
-    if (options.bridgeOptions) {
-      bridge = createSimpleViewerBridge(options.bridgeOptions)
-    }
+    // Attach gesture handler to canvas
+    attachGestureHandler(handler, canvas)
 
     attached = true
   }
@@ -261,8 +272,6 @@ export interface SimpleGestureOptions {
 export function createSimpleGestureIntegration(
   options: SimpleGestureOptions
 ): GestureViewerIntegration {
-  const store = options.store
-  
   return createGestureViewerIntegration({
     gestureConfig: {
       tapThreshold: 10,
@@ -273,11 +282,8 @@ export function createSimpleGestureIntegration(
     },
     onTap: options.onSelect
       ? (point) => {
-          // Convert screen point to entity selection
-          if (store) {
-            // TODO: Use store.pickEntity(point) when available
-            console.log('[gesture] tap at', point)
-          }
+          // TODO: Convert screen point to entity selection
+          console.log('[gesture] tap at', point)
         }
       : undefined,
     onPanMove: options.onPan
@@ -289,9 +295,6 @@ export function createSimpleGestureIntegration(
       ? (scale) => {
           options.onZoom?.(scale)
         }
-      : undefined,
-    bridgeOptions: store
-      ? { store }
       : undefined
   })
 }

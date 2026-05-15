@@ -19,7 +19,6 @@ import {
   DimensionGeometry,
   BlockGeometry,
   BoundingBox,
-  EntityMetadata,
   createBoundingBox
 } from './types.js'
 

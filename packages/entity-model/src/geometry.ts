@@ -5,7 +5,7 @@
  * Does NOT touch viewer, upload, or UI.
  */
 
-import { Point2D, Point3D, BoundingBox } from './types.js'
+import { Point2D, Point3D } from './types.js'
 
 // ============================================================================
 // Distance Functions

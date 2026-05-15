@@ -233,14 +233,14 @@ function executeZoomToEntity(
     return { success: false, error: `Entity not found: ${cmd.entityId}` }
   }
 
-  const padding = cmd.padding ?? 1.0
+const padding = cmd.padding ?? 1.0
   const bbox = entity.bbox
   
   const viewport: ViewportCommand = {
     type: 'zoom_to_bbox',
     bbox: {
-      min: { x: bbox.min.x - padding, y: bbox.min.y - padding, z: 0 },
-      max: { x: bbox.max.x + padding, y: bbox.max.y + padding, z: 0 }
+      min: { x: bbox.minX - padding, y: bbox.minY - padding, z: bbox.minZ },
+      max: { x: bbox.maxX + padding, y: bbox.maxY + padding, z: bbox.maxZ }
     },
     padding
   }

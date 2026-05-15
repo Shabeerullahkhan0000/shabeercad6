@@ -6,22 +6,22 @@
  */
 
 import { 
-  EntityStore, 
-  CadCommand, 
+  CadCommandType, 
   CommandContext, 
+  CommandResult,
+  ViewportCommand,
   executeStoreCommand,
   MeasurementResult 
 } from './command-engine.js'
+import { EntityStore } from './store.js'
 
 import {
   OverlayManager,
   ViewportState,
-  createOverlayManager,
-  MeasurementOverlay,
-  HandleOverlay
+  createOverlayManager
 } from './overlay.js'
 
-import { Point3D, CadEntity, BoundingBox } from './types.js'
+import { Point3D, BoundingBox } from './types.js'
 
 // ============================================================================
 // Integration Types
@@ -67,10 +67,10 @@ export class OverlayCommandIntegration {
   // Command Execution with Overlay
   // ============================================================================
 
-  /** Execute command and sync overlay */
+/** Execute command and sync overlay */
   executeAndSync(
-    command: CadCommand,
-    context: CommandContext
+    command: CadCommandType,
+    context: Omit<CommandContext, 'syncOptions'> & { syncOptions?: OverlaySyncOptions }
   ): { success: boolean; error?: string } {
     // Clear overlays if requested
     if (context.syncOptions?.clearFirst) {
@@ -119,19 +119,17 @@ export class OverlayCommandIntegration {
   // Measurement Sync
   // ============================================================================
 
-  /** Sync measurement to overlay */
+/** Sync measurement to overlay */
   private _syncMeasurement(measurement: MeasurementResult): void {
-    if (!measurement.start || !measurement.end) return
+    if (!measurement.point1 || !measurement.point2) return
 
     this._overlay.setMeasurement(
       'command-measurement',
-      measurement.start,
-      measurement.end,
+      measurement.point1,
+      measurement.point2,
       measurement.distance,
       {
-        label: measurement.label,
-        precision: measurement.precision,
-        unit: measurement.unit
+        label: measurement.label
       }
     )
   }
@@ -224,12 +222,12 @@ export class OverlayCommandIntegration {
   // Helpers
   // ============================================================================
 
-  /** Get bounding box center */
+/** Get bounding box center */
   private _bboxCenter(bbox: BoundingBox): Point3D {
     return {
-      x: (bbox.min.x + bbox.max.x) / 2,
-      y: (bbox.min.y + bbox.max.y) / 2,
-      z: (bbox.min.z + bbox.max.z) / 2
+      x: (bbox.minX + bbox.maxX) / 2,
+      y: (bbox.minY + bbox.maxY) / 2,
+      z: (bbox.minZ + bbox.maxZ) / 2
     }
   }
 }

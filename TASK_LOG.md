@@ -620,3 +620,38 @@
 - **Why This Approach**: --parallel=false ensures cad-simple-viewer builds before example
 - **Test Steps**: Redeploy to Vercel, verify build succeeds
 - **Risks**: Low - explicit package targeting
+
+### Task 39: Verify Basic Two-Point Distance Measurement
+- **Date**: 2025
+- **Action**: Verified basic two-point distance measurement is implemented
+- **Files Changed**: None - already implemented in distancemeasurement.ts
+- **Verified Implementation**:
+  1. MeasurementState: IDLE, POINT_A, COMPLETE
+  2. createDistanceMeasurement(): Manager factory
+  3. Uses @mlightcad/cad-simple-viewer via getViewerViewport() - does NOT mutate viewer
+  4. Uses OverlayManager for DOM rendering - separate layer
+  5. Uses geometry helpers: distance(), screenToWorld() - separate module
+  6. Mobile behavior: tap Point A → show marker → tap Point B → show line/distance
+  7. No live preview after Point A (marker visible, waits for second tap)
+  8. fastMode: auto-reset after 100ms for quick next measurement
+  9. Unit support: mm, cm, m, in, ft
+  10. No snapping enabled (pure screen coordinates)
+  11. No endpoint editing (basic version)
+- **Why This Approach**: Task requirements already met by existing implementation
+- **Test Steps**: Verify tap A → tap B → distance displays correctly
+- **Risks**: None - existing functionality
+
+### Task 40: Fix Type Errors for Build
+- **Date**: 2025
+- **Action**: Fixed type errors in entity-model package
+- **Files Changed**: 
+  - packages/entity-model/src/command-engine.ts
+  - packages/entity-model/src/overlay-integration.ts
+- **Changes**:
+  1. Fixed BoundingBox property access: bbox.minX/bbox.maxX (not bbox.min.x)
+  2. Fixed MeasurementResult properties: point1/point2 (not start/end)
+  3. Fixed executeAndSync context type with OverlaySyncOptions
+- **Root Cause**: Type mismatches between interfaces
+- **Why This Approach**: Required for clean build
+- **Test Steps**: Run pnpm build, verify no TypeScript errors
+- **Risks**: Low - type fixes only

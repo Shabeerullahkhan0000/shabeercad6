@@ -21,11 +21,18 @@ export default defineConfig(() => {
         // worker file urls in AcApDocManager.createInstance
         targets: [
           {
-            src: './node_modules/@mlightcad/data-model/dist/dxf-parser-worker.js',
+            // Workers from workspace library package (symlinked via pnpm workspace)
+            src: '../cad-simple-viewer/dist/libredwg-parser-worker.js',
             dest: 'workers'
           },
           {
-            src: './node_modules/@mlightcad/cad-simple-viewer/dist/*-worker.js',
+            // Workers from data-model dependency package
+            src: '../../node_modules/.pnpm/@mlightcad+data-model@1.7.34/node_modules/@mlightcad/data-model/dist/dxf-parser-worker.js',
+            dest: 'workers'
+          },
+          {
+            // Workers from mtext-renderer package (symlinked via pnpm workspace)
+            src: '../../node_modules/.pnpm/node_modules/@mlightcad/mtext-renderer/dist/mtext-renderer-worker.js',
             dest: 'workers'
           }
         ]

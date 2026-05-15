@@ -1173,7 +1173,7 @@ export class AcApDocManager {
         parserWorkerUrl:
           webworkerFileUrls && webworkerFileUrls.dxfParser
             ? webworkerFileUrls.dxfParser
-            : './assets/dxf-parser-worker.js'
+            : './workers/dxf-parser-worker.js'
       })
       AcDbDatabaseConverterManager.instance.register(
         AcDbFileType.DXF,
@@ -1191,7 +1191,7 @@ export class AcApDocManager {
         parserWorkerUrl:
           webworkerFileUrls && webworkerFileUrls.dwgParser
             ? webworkerFileUrls.dwgParser
-            : './assets/libredwg-parser-worker.js'
+            : './workers/libredwg-parser-worker.js'
       })
       AcDbDatabaseConverterManager.instance.register(
         AcDbFileType.DWG,
@@ -1219,7 +1219,7 @@ export class AcApDocManager {
     AcTrMTextRenderer.getInstance().initialize(
       webworkerFileUrls && webworkerFileUrls.mtextRender
         ? webworkerFileUrls.mtextRender
-        : './assets/mtext-renderer-worker.js'
+        : './workers/mtext-renderer-worker.js'
     )
   }
 
