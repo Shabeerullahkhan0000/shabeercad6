@@ -14,6 +14,7 @@
   ],
   "packageManager": "pnpm@10.33.4",
   "scripts": {
+    "postinstall": "pnpm build",
     "analyze": "nx run-many -t analyze",
     "build": "nx run-many -t build",
     "clean": "nx run-many -t clean",

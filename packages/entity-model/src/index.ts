@@ -38,3 +38,6 @@ export * from './gesture-integration.js'
 
 // Distance Measurement
 export * from './distancemeasurement.js'
+
+// Snap Engine
+export * from './snap-engine.js'

@@ -2,6 +2,19 @@
 
 ## Completed Tasks
 
+### Task 21: Fix Gesture Integration Type Errors
+- **Date**: 2024
+- **Action**: Fixed type errors in gesture-integration.ts
+- **Files Changed**: packages/entity-model/src/gesture-integration.ts
+- **Changes**:
+  - Changed import from non-existent `GestureHandler` to `MobileGestureHandler`
+  - Changed interface property type from `GestureHandler` to `MobileGestureHandler`
+  - Changed local variable type from `GestureHandler` to `MobileGestureHandler`
+  - Updated re-export types to include `MobileGestureHandler` and `GestureState`
+- **Why This Approach**: Non-existent type export was causing build failures
+- **Test Steps**: Verify package builds correctly
+- **Risks**: Low - type fix only
+
 ### Task 1: Repository Clone and Inspection
 - **Date**: 2024
 - **Action**: Cloned repository https://github.com/mlightcad/cad-viewer
@@ -537,3 +550,56 @@
 - **Files Changed**: packages/entity-model/src/distancemeasurement.ts, TASK_LOG.md
 - **Commit**: "Add editable measurement endpoints - P1/P2 handles, drag, live update"
 - **Push Status**: ✅ Pushed to GitHub
+
+### Task 35: Fix Vercel Build via postinstall
+- **Date**: 2025
+- **Action**: Added postinstall script to automatically build local packages
+- **Files Changed**: package.json
+- **Changes**:
+  1. Added "postinstall": "pnpm build" script
+  2. Ensures local packages are built before examples try to import them
+  3. Fixes Vercel error: "Cannot find module @mlightcad/cad-simple-viewer"
+- **Why This Approach**: Vercel monorepo needs build order guarantee
+- **Test Steps**: Test deployment on Vercel
+- **Risks**: Low - just build order fix
+
+### Task 36: Mobile Performance - Drag Without Flicker
+- **Date**: 2025
+- **Action**: Optimized overlay container for mobile drag performance
+- **Files Changed**: packages/entity-model/src/overlay.ts
+- **Changes**:
+  1. Added willChange: 'transform' for GPU acceleration
+  2. Added overscrollBehavior: 'none' to prevent iOS rubber-banding
+  3. Handle uses transform: translate for centering (no layout thrash)
+- **Why This Approach**: Mobile drag must be smooth, no flicker
+- **Test Steps**: Test drag on mobile, verify no flicker
+- **Risks**: Low - CSS only
+
+### Task 37: Add Snap Engine
+- **Date**: 2025
+- **Action**: Implemented snap engine with endpoint/midpoint/nearest/intersection snap
+- **Files Changed**: packages/entity-model/src/snap-engine.ts, packages/entity-model/src/index.ts
+- **Changes**:
+  1. SnapEngine class with SnapMode enum: ENDPOINT, MIDPOINT, NEAREST, INTERSECTION
+  2. snapAt(screenPoint): SnapResult | null
+  3. Bounding box pre-filter before detailed geometry checks
+   4. Screen-distance tolerance (world→screen conversion)
+   5. Support for Line, Polyline, Circle, Arc, Insert, Point entities
+   6. createSnapEngine() factory
+   7. showSnapIndicator/hideSnapIndicator for visual feedback
+   8. No viewer internals touched - pure geometry + entity layer
+- **Why This Approach**: Performance - avoids scanning all entities on every touchmove
+- **Test Steps**: Test endpoint/midpoint/nearest/intersection snap
+- **Risks**: Low - geometry helpers only
+
+### Task 38: Fix Vercel Build - Explicit Package Target
+- **Date**: 2025
+- **Action**: Fixed Vercel build by explicitly targeting cad-simple-viewer-example
+- **Files Changed**: vercel.json
+- **Changes**:
+  1. Changed buildCommand to: pnpm nx run-many -t build --projects=cad-simple-viewer,cad-simple-viewer-example --parallel=false
+  2. Set framework: null (disables Nx auto-detection)
+- **Root Cause**: Nx was auto-detecting cad-viewer-example (deprecated Vue package) instead of target
+- **Why This Approach**: --parallel=false ensures cad-simple-viewer builds before example
+- **Test Steps**: Redeploy to Vercel, verify build succeeds
+- **Risks**: Low - explicit package targeting

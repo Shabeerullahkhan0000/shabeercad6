@@ -83,19 +83,22 @@ export interface ViewportState {
   panX: number
   /** Camera pan offset Y */
   panY: number
-  /** Container dimensions */
+  /** Container dimensions (CSS pixels) */
   width: number
   height: number
+  /** Device pixel ratio for high-DPI screens */
+  devicePixelRatio?: number
 }
 
-/** Convert world point to screen coordinates */
+/** Convert world point to screen coordinates (CSS pixels) */
 export function worldToScreen(
   worldPoint: Point3D,
   viewport: ViewportState
 ): { x: number; y: number } {
+  const dpr = viewport.devicePixelRatio ?? (typeof window !== 'undefined' ? window.devicePixelRatio : 1)
   return {
-    x: (worldPoint.x * viewport.zoom) + viewport.panX + (viewport.width / 2),
-    y: (-worldPoint.y * viewport.zoom) + viewport.panY + (viewport.height / 2)
+    x: ((worldPoint.x * viewport.zoom) + viewport.panX + (viewport.width / 2)) / dpr,
+    y: ((-worldPoint.y * viewport.zoom) + viewport.panY + (viewport.height / 2)) / dpr
   }
 }
 
@@ -139,10 +142,14 @@ export class OverlayManager {
     this._initContainer()
   }
 
-  /** Initialize container styles */
+/** Initialize container styles for mobile drag performance */
   private _initContainer(): void {
     this._container.style.position = 'relative'
     this._container.style.pointerEvents = 'none'
+    // GPU acceleration for smooth drag
+    this._container.style.willChange = 'transform'
+    // Prevent iOS Safari rubber-banding
+    this._container.style.overscrollBehavior = 'none'
   }
 
   /** Set viewport state for transforms */
@@ -434,7 +441,7 @@ export class OverlayManager {
       el.style.borderRadius = '50%'
     }
     
-    // Center the handle
+// Center the handle
     el.style.marginLeft = `-${size / 2}px`
     el.style.marginTop = `-${size / 2}px`
   }

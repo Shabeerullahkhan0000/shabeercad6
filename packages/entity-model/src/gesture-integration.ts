@@ -14,7 +14,7 @@ import {
   createMobileGestureHandler,
   attachGestureHandler,
   type GestureConfig,
-  type GestureHandler,
+  type MobileGestureHandler,
   type HitTestFn,
   type GestureEvent
 } from './gesture.js'
@@ -56,7 +56,7 @@ export interface GestureViewerIntegrationOptions {
  */
 export interface GestureViewerIntegration {
   /** The gesture handler */
-  handler: GestureHandler
+  handler: MobileGestureHandler
   /** Attach to canvas */
   attach: () => void
   /** Detach from canvas */
@@ -111,7 +111,7 @@ export function createGestureViewerIntegration(
     onPinchEnd
   } = options
 
-  let handler: GestureHandler | null = null
+let handler: MobileGestureHandler | null = null
   let bridge: EntityViewerBridge | null = null
   let attached = false
   let canvas: HTMLCanvasElement | null = null
@@ -185,16 +185,31 @@ export function createGestureViewerIntegration(
     attached = true
   }
 
+/** Cleanup bound for beforeunload */
+  function cleanup() {
+    if (!attached) return
+    detach()
+  }
+
   function detach() {
-    if (!attached || !canvas || !handler) return
+    // Guard against double detach
+    if (!attached || !canvas || !handler) {
+      attached = false
+      return
+    }
 
     // Remove event listeners
     canvas.removeEventListener('touchstart', handler as any)
     canvas.removeEventListener('touchmove', handler as any)
     canvas.removeEventListener('touchend', handler as any)
     canvas.removeEventListener('touchcancel', handler as any)
+    // Remove beforeunload fallback
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('beforeunload', cleanup)
+    }
 
     attached = false
+    canvas = null
   }
 
   function setHitTest(hitTest: HitTestFn) {
@@ -289,8 +304,9 @@ export {
 
 export type {
   GestureConfig,
-  GestureHandler,
-  GestureState,
-  GestureEvent,
-  HitTestFn
+  MobileGestureHandler,
+  HitTestFn,
+  GestureEvent
 } from './gesture.js'
+
+export { GestureState } from './gesture.js'
